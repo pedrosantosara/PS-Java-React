@@ -1,105 +1,82 @@
 package br.com.banco.controller;
 
-import java.sql.Timestamp;
-
-import java.time.LocalDateTime;
-import java.util.Collections;
+import java.time.LocalDate;
 import java.util.List;
-import java.util.stream.Collectors;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import br.com.banco.transferencia.Transferencia;
-import br.com.banco.transferencia.TransferenciaDTO;
-import br.com.banco.transferencia.TransferenciaRepository;
+import br.com.banco.dto.TransferenciaDTO;
+import br.com.banco.response.TransferenciaRes;
+import br.com.banco.dto.ContaInfoDTO;
+import br.com.banco.dto.ContaSaldoDTO;
+
+import br.com.banco.repository.TransferenciaRepository;
+
+import br.com.banco.service.ContaService;
+import br.com.banco.service.TransferenciaService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 
 @RestController
-public class TransferenciaController {
-    private final TransferenciaRepository repository;
 
-    @Autowired
-    public TransferenciaController(TransferenciaRepository repository) {
-        this.repository = repository;
+@RequestMapping(produces = {"application/json"})
+@Tag(name = "Banco")
+public class TransferenciaController {
+
+    private TransferenciaService transferenciaService;
+
+    private ContaService contaService;
+
+    public TransferenciaController(
+            TransferenciaRepository transferenciaRepository,
+            TransferenciaService transferenciaService,
+            ContaService contaService) {
+        this.transferenciaService = transferenciaService;
+        this.contaService = contaService;
     }
 
-    @GetMapping("/transferencias/{id}")
-    public ResponseEntity<List<TransferenciaDTO>> getTransferenciasByContaId(@PathVariable int id) {
-        List<Transferencia> transferencias = repository.findByContaId(id);
+    @Operation(summary = "Pesquisa por conta por id com queryParameters(Opcional)", method = "GET")
+    @GetMapping("/transferencias/conta/{id}")
+    public ResponseEntity<ContaSaldoDTO> getTransferenciasESaldoByContaId(
+            @PathVariable Long id,
+            @RequestParam(required = false) String nomeOperadorTransacao,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate inicio,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate fim,
+            Pageable pageable) {
 
-        if (transferencias.isEmpty()) {
+        ContaSaldoDTO contaSaldoDTO = transferenciaService.getTransferenciasESaldoByContaId(id, nomeOperadorTransacao,
+                inicio,
+                fim, pageable);
+        if (contaSaldoDTO.getTransferencias().isEmpty()) {
             return ResponseEntity.notFound().build();
         } else {
-            List<TransferenciaDTO> transferenciaDTOs = transferencias.stream()
-                    .map(TransferenciaDTO::new)
-                    .collect(Collectors.toList());
-            return ResponseEntity.ok(transferenciaDTOs);
+            return ResponseEntity.ok(contaSaldoDTO);
         }
     }
 
-    @GetMapping("/transferenciaas")
-    public List<Transferencia> getTransferencias(
-            @RequestParam("inicio") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime inicio,
-            @RequestParam("fim") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fim) {
-
-        Timestamp inicioTimestamp = Timestamp.valueOf(inicio);
-        Timestamp fimTimestamp = Timestamp.valueOf(fim);
-
-        return repository.findAllByDataTransferenciaBetween(inicioTimestamp, fimTimestamp);
-    }
-
+    @Operation(summary = "Retorna todas as transferencia com queryParameters(Opcional) ", method = "GET")
     @GetMapping("/transferencias")
-    public ResponseEntity<Page<TransferenciaDTO>> getTransferencias(
-        @RequestParam(required = false) String nomeOperadorTransacao,
-        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime inicio,
-        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fim,
-        Pageable pageable) {
+    public ResponseEntity<TransferenciaRes> listTransferencias(
+            @RequestParam(required = false) String nomeOperadorTransacao,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate inicio,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate fim,
+            Pageable pageable) {
 
-    List<Transferencia> transferencias;
+        List<TransferenciaDTO> transferencias = transferenciaService.listTransferencias(nomeOperadorTransacao, inicio,
+                fim, pageable);
+        List<ContaInfoDTO> contasComTransferencias = contaService.listContas();
 
-    if (nomeOperadorTransacao != null) {
-        transferencias = repository.findByNomeOperadorTransacao(nomeOperadorTransacao);
-    } else if (inicio != null && fim != null) {
-        Timestamp inicioTimestamp = Timestamp.valueOf(inicio);
-        Timestamp fimTimestamp = Timestamp.valueOf(fim);
-        transferencias = repository.findAllByDataTransferenciaBetween(inicioTimestamp, fimTimestamp);
-    } else {
-        transferencias = repository.findAll();
-    }
+        TransferenciaRes response = new TransferenciaRes(transferencias, contasComTransferencias);
 
-        int pageSize = pageable.getPageSize();
-        int currentPage = pageable.getPageNumber();
-        int startItem = currentPage * pageSize;
-        List<Transferencia> transferenciasPaginadas;
-
-        if (transferencias.size() < startItem) {
-            transferenciasPaginadas = Collections.emptyList();
-        } else {
-            int toIndex = Math.min(startItem + pageSize, transferencias.size());
-            transferenciasPaginadas = transferencias.subList(startItem, toIndex);
-        }
-
-        if (transferenciasPaginadas.isEmpty()) {
-            return ResponseEntity.noContent().build();
-        } else {
-            List<TransferenciaDTO> transferenciaDTOs = transferenciasPaginadas.stream()
-                    .map(TransferenciaDTO::new)
-                    .collect(Collectors.toList());
-
-            Page<TransferenciaDTO> transferenciaPage = new PageImpl<>(transferenciaDTOs, pageable,
-                    transferencias.size());
-
-            return ResponseEntity.ok(transferenciaPage);
-        }
+        return ResponseEntity.ok(response);
     }
 
 }
