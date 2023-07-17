@@ -33,6 +33,7 @@ Para instalar o Frontend Entrar no Repositorio acima e seguir passo a passo.
 
 * Execute com sua IDE de preferencia
 * Ou via Linha de comando
+* Necessario ter o java 11
 
 # Acessar rotas e documentação
 
