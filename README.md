@@ -55,3 +55,5 @@ Para instalar o Frontend Entrar no Repositorio acima e seguir passo a passo.
       * size = Quantidade de elementos por pagina que deseja dividir
       * page = Pagina que deseja acessar (O page começa com 0 então se dividir a pagina em size = 4 e a pagina tiver 9 elementos ela vai ter 2 page = page=0 e page=1)
     * Devido ao tempo o pageable não foi implementado 100% e esta funcional mas não esta sendo consumido pelo frontend
+# Preview Documentação
+![image](https://github.com/pedrosantosara/PS-Java-React/assets/59851589/61ac27f4-63ac-496a-b052-8ddd5cdfcfa3)
